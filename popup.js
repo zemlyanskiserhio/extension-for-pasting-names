@@ -32,6 +32,7 @@ const copyMeet = document.getElementById("copyMeet");
 const resetMeet = document.getElementById("resetMeet");
 
 const DEFAULT_TITLE = "Встреча о том о сем";
+const DEFAULT_LINK = "https://alfabank.ktalk.ru/zemlyanskiy";
 const DEFAULT_TEMPLATE = "ял яля";
 
 let lists = [];
@@ -409,12 +410,20 @@ async function createList() {
   renderKeys();
 }
 
+function ensureMeetingDefaults() {
+  if (!meetTitle.value.trim()) meetTitle.value = DEFAULT_TITLE;
+  if (!meetLink.value.trim()) meetLink.value = DEFAULT_LINK;
+  if (!meetPlace.value.trim()) meetPlace.value = DEFAULT_LINK;
+  if (!meetTemplate.value.trim()) meetTemplate.value = DEFAULT_TEMPLATE;
+}
+
 function meetingParts() {
-  const place = meetPlace.value.trim().slice(0, 255);
-  const link = meetLink.value.trim();
+  ensureMeetingDefaults();
+  const link = meetLink.value.trim() || DEFAULT_LINK;
+  const place = (meetPlace.value.trim() || link).slice(0, 255);
   const source = meetTemplate.value.trim() ? meetTemplate.value : DEFAULT_TEMPLATE;
   let body = source.replaceAll("{place}", place).replaceAll("{link}", link);
-  if (link && !source.includes("{link}") && !body.includes(link)) body = `${body.trim()}\n\n${link}`;
+  if (link && !body.includes(link)) body = `${body.trim()}\n\n${link}`;
   body = body.replace(/\n{3,}/g, "\n\n").trim();
   return {
     title: (meetTitle.value.trim() || DEFAULT_TITLE).slice(0, 255),
@@ -452,9 +461,9 @@ function scheduleMeetingSave() {
 function applyMeeting(saved) {
   const meeting = saved && typeof saved === "object" ? saved : null;
   if (!meeting) return;
-  if (typeof meeting.title === "string") meetTitle.value = meeting.title;
-  if (typeof meeting.place === "string") meetPlace.value = meeting.place;
-  if (typeof meeting.link === "string") meetLink.value = meeting.link;
+  if (typeof meeting.title === "string" && meeting.title.trim()) meetTitle.value = meeting.title;
+  if (typeof meeting.place === "string" && meeting.place.trim()) meetPlace.value = meeting.place;
+  if (typeof meeting.link === "string" && meeting.link.trim()) meetLink.value = meeting.link;
   if (typeof meeting.template === "string" && meeting.template.trim()) meetTemplate.value = meeting.template;
 }
 
@@ -744,6 +753,8 @@ copyMeet.addEventListener("click", async () => {
 
 resetMeet.addEventListener("click", () => {
   meetTitle.value = DEFAULT_TITLE;
+  meetPlace.value = DEFAULT_LINK;
+  meetLink.value = DEFAULT_LINK;
   meetTemplate.value = DEFAULT_TEMPLATE;
   scheduleMeetingSave();
   setLocalStatus("Template reset to the stub.");
@@ -775,8 +786,7 @@ document.addEventListener("keydown", (event) => {
   if (menuOpen) setMenuOpen(false);
 });
 
-if (!meetTitle.value.trim()) meetTitle.value = DEFAULT_TITLE;
-if (!meetTemplate.value.trim()) meetTemplate.value = DEFAULT_TEMPLATE;
+ensureMeetingDefaults();
 setMenuOpen(false);
 renderPreview();
 syncCreate();
@@ -787,6 +797,7 @@ storageGet(["draft", "pause", "lists", "meeting"]).then((saved) => {
   if (saved.pause) pauseEl.value = String(saved.pause);
   lists = sanitizeLists(saved.lists);
   applyMeeting(saved.meeting);
+  ensureMeetingDefaults();
   updateCount();
   renderKeys();
   renderPreview();
