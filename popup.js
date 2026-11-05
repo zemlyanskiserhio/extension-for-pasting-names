@@ -8,7 +8,11 @@ const logEl = document.getElementById("log");
 const problemLabel = document.getElementById("problemLabel");
 const problemsEl = document.getElementById("problems");
 const keysEl = document.getElementById("keys");
+const appEl = document.getElementById("app");
+const drawerTab = document.getElementById("drawerTab");
+const drawerEl = document.getElementById("drawer");
 const pianoMark = document.getElementById("pianoMark");
+let menuOpen = false;
 const newListBtn = document.getElementById("newList");
 const createBox = document.getElementById("createBox");
 const createName = document.getElementById("createName");
@@ -224,14 +228,15 @@ function buildKeyBody(list) {
 }
 
 function renderKeys() {
-  pianoMark.textContent = lists.length ? `🎹 Lists · ${lists.length}` : "🎹 Lists";
+  const mark = lists.length ? `Lists · ${lists.length}` : "Lists";
+  pianoMark.textContent = mark;
+  drawerTab.textContent = mark;
   keysEl.replaceChildren();
   if (!lists.length) {
     keysEl.appendChild(el("p", "keys-empty", "Paste names, then save a list. It stays here after a reload."));
   }
-  lists.forEach((list, index) => {
+  lists.forEach((list) => {
     const item = el("section", "key");
-    item.classList.add(index % 2 ? "ebony" : "ivory");
     if (openId === list.id) item.classList.add("open");
     if (editingId === list.id) item.classList.add("current");
     const top = el("div", "key-top");
@@ -699,19 +704,34 @@ resetMeet.addEventListener("click", () => {
   setLocalStatus("Template reset to the stub.");
 });
 
+function setMenuOpen(open) {
+  menuOpen = open;
+  appEl.classList.toggle("menu-open", open);
+  drawerTab.setAttribute("aria-expanded", open ? "true" : "false");
+  drawerEl.setAttribute("aria-hidden", open ? "false" : "true");
+  drawerEl.inert = !open;
+  drawerTab.title = open ? "Hide saved lists" : "Saved lists";
+}
+
+drawerTab.addEventListener("click", () => setMenuOpen(!menuOpen));
+
 document.addEventListener("keydown", (event) => {
   const target = event.target;
   if (event.key !== "Escape" || (target instanceof Element && target.closest("input, textarea"))) return;
-  if (!creating && !openId && !renamingId) return;
-  creating = false;
-  openId = null;
-  renamingId = null;
-  confirmDeleteId = null;
-  syncCreate();
-  renderKeys();
+  if (creating || openId || renamingId) {
+    creating = false;
+    openId = null;
+    renamingId = null;
+    confirmDeleteId = null;
+    syncCreate();
+    renderKeys();
+    return;
+  }
+  if (menuOpen) setMenuOpen(false);
 });
 
 if (!meetTemplate.value.trim()) meetTemplate.value = DEFAULT_TEMPLATE;
+setMenuOpen(false);
 renderPreview();
 syncCreate();
 renderKeys();

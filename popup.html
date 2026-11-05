@@ -6,16 +6,19 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div class="app">
-    <aside class="piano" aria-label="Saved name lists">
-      <div class="piano-mark" id="pianoMark">🎹 Lists</div>
-      <div class="keys" id="keys"></div>
-      <div class="create" id="createBox" hidden>
-        <input id="createName" maxlength="40" placeholder="List name" spellcheck="false" autocomplete="off" aria-label="List name">
-        <p id="createMeta"></p>
-        <button id="createSave" type="button">💾 Save</button>
+  <div class="app" id="app">
+    <button id="drawerTab" type="button" class="drawer-tab" aria-expanded="false" aria-controls="drawer" title="Saved lists">Lists</button>
+    <aside id="drawer" class="drawer" aria-label="Saved name lists" aria-hidden="true">
+      <div class="drawer-inner">
+        <div class="drawer-head"><span id="pianoMark">Lists</span></div>
+        <div class="keys" id="keys"></div>
+        <div class="create" id="createBox" hidden>
+          <input id="createName" maxlength="40" placeholder="List name" spellcheck="false" autocomplete="off" aria-label="List name">
+          <p id="createMeta"></p>
+          <button id="createSave" type="button">💾 Save</button>
+        </div>
+        <button id="newList" type="button" class="key-add" title="Save the current names as a list">＋ Save list</button>
       </div>
-      <button id="newList" type="button" class="key-add" title="Save the current names as a list">＋ Save list</button>
     </aside>
 
     <main>

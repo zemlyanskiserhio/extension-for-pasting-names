@@ -4,7 +4,7 @@
 
 body {
   margin: 0;
-  width: 640px;
+  width: max-content;
   height: 580px;
   overflow: hidden;
   font: 13px/1.4 "Segoe UI", sans-serif;
@@ -18,95 +18,101 @@ body {
   min-height: 0;
 }
 
-.piano {
-  width: 200px;
+.drawer-tab {
   flex: none;
+  align-self: flex-start;
+  width: 28px;
+  margin-top: 16px;
+  padding: 14px 0;
+  border: 0;
+  border-radius: 0 8px 8px 0;
+  background: #0f6cbd;
+  color: #fff;
+  writing-mode: vertical-lr;
+  letter-spacing: .08em;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.drawer-tab:hover { background: #115ea3; }
+
+.drawer {
+  flex: none;
+  width: 0;
+  overflow: hidden;
+  background: #fff;
+  transition: width .2s ease;
+}
+
+.app.menu-open .drawer {
+  width: 240px;
+  border-right: 1px solid #e1dfdd;
+}
+
+.drawer-inner {
+  width: 240px;
+  height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  color: #f3f2f1;
-  background:
-    linear-gradient(#1c1b1a, #1c1b1a) top / 100% 8px no-repeat,
-    linear-gradient(180deg, #3a3836 0%, #2b2928 48%, #221f1e 100%);
-  box-shadow: inset -10px 0 16px rgba(0, 0, 0, .28);
+  transform: translateX(-240px);
+  transition: transform .2s ease;
 }
 
-.piano-mark {
+.app.menu-open .drawer-inner { transform: none; }
+
+.drawer-head {
   flex-shrink: 0;
   padding: 14px 12px 8px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 650;
-  letter-spacing: .02em;
 }
 
 .keys {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .keys-empty {
   margin: 0 12px 10px;
-  color: #d2d0ce;
+  color: #605e5c;
   font-size: 12px;
   line-height: 1.35;
 }
 
 .key {
-  margin: 0 10px 7px;
-  border-radius: 0 0 6px 6px;
+  margin: 0 10px 6px;
+  border: 1px solid #e1dfdd;
+  border-radius: 6px;
+  background: #fff;
   overflow: hidden;
-  transition: margin .12s ease, background .12s ease;
-}
-
-.key.ivory {
-  color: #1b1a19;
-  background: linear-gradient(#fffefb, #f3f1ee);
-  border-top: 2px solid #fff;
-  box-shadow: 0 3px 0 #b7b3ae, 0 5px 8px rgba(0, 0, 0, .22);
-}
-
-.key.ebony:not(.open) {
-  margin-left: 24px;
-  margin-right: 24px;
-  color: #faf9f8;
-  background: linear-gradient(#3f3d3b, #232221);
-  border-top: 2px solid #5c5956;
-  box-shadow: 0 3px 0 #111, 0 5px 8px rgba(0, 0, 0, .35);
 }
 
 .key.open {
-  margin-left: 10px;
-  margin-right: 10px;
-  color: #1b1a19;
+  border-color: #0f6cbd;
   background: #f7fbfe;
-  border-top: 2px solid #fff;
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, .14);
 }
 
-.key.current {
-  outline: 2px solid #0f6cbd;
-  outline-offset: 1px;
-}
+.key.current { box-shadow: inset 3px 0 0 #0f6cbd; }
 
 .key-face {
   width: 100%;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 8px;
+  padding: 8px;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: inherit;
+  color: #1b1a19;
   text-align: left;
   user-select: none;
   cursor: pointer;
 }
 
 .key-face:hover { background: rgba(15, 108, 189, .08); }
-.key.ebony:not(.open) .key-face:hover { background: rgba(255, 255, 255, .06); }
 
 .key-emoji { flex: none; }
 
@@ -129,7 +135,6 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.key.ebony:not(.open) .key-count { background: rgba(255, 255, 255, .14); }
 .key.open .key-count { background: rgba(15, 108, 189, .12); color: #0f6cbd; }
 
 .key-rename {
@@ -186,8 +191,9 @@ body {
   flex-shrink: 0;
   margin: 0 10px 8px;
   padding: 8px;
+  border: 1px solid #e1dfdd;
   border-radius: 6px;
-  background: #fff;
+  background: #faf9f8;
   color: #1b1a19;
 }
 
@@ -221,16 +227,11 @@ body {
   border-radius: 4px;
   background: #0f6cbd;
   color: #fff;
-  box-shadow: 0 3px 0 #0a4f8c;
-}
-
-.key-add:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 0 #0a4f8c;
 }
 
 main {
-  flex: 1;
+  width: 392px;
+  flex: none;
   min-width: 0;
   overflow: auto;
   padding: 14px 14px 12px;
@@ -435,5 +436,5 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .key, .key-body { animation: none; transition: none; }
+  .key, .key-body, .drawer, .drawer-inner { animation: none; transition: none; }
 }
