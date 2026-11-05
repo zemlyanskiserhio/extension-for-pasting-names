@@ -82,6 +82,32 @@
     return attendeeRows().length;
   }
 
+  function attendeeRemoveButton(row) {
+    return [...row.querySelectorAll("button")].find((button) => {
+      if (!isVisible(button)) return false;
+      const title = (button.getAttribute("title") || "").trim();
+      const labelledBy = button.getAttribute("aria-labelledby");
+      const labelled = labelledBy ? (document.getElementById(labelledBy)?.textContent || "") : "";
+      return /^(удалить|remove)$/i.test(title) || /удалить участника|remove attendee|remove participant/i.test(labelled);
+    }) || null;
+  }
+
+  async function clearAttendees() {
+    let removed = 0;
+    for (let guard = 0; guard < 100; guard += 1) {
+      const row = attendeeRows().find((item) => attendeeRemoveButton(item));
+      if (!row) break;
+      const button = attendeeRemoveButton(row);
+      const before = attendeeCount();
+      await realClick(button);
+      const deadline = Date.now() + 1600;
+      while (Date.now() < deadline && attendeeCount() >= before) await sleep(80);
+      if (attendeeCount() >= before) break;
+      removed += 1;
+    }
+    return removed;
+  }
+
   function alreadyListed(name) {
     return attendeeRows().some((row) => isGoodMatch(row.textContent, name));
   }
@@ -625,21 +651,22 @@
 
   window.__owaFillMeeting = async (details) => {
     if (bus.state.running) return { ok: false, reason: "busy" };
-    const titleInput = details?.title ? findTitleInput() : null;
-    const locationInput = details?.place ? findLocationInput() : null;
-    const body = details?.body ? findEventBody() : null;
-    if (!titleInput && !locationInput && !body) return { ok: false, reason: "no-form" };
+    const titleInput = findTitleInput();
+    const locationInput = findLocationInput();
+    const body = findEventBody();
+    if (!titleInput && !locationInput && !body && !attendeeCount()) return { ok: false, reason: "no-form" };
     const filled = [];
     const missed = [];
-    if (details?.title) (titleInput ? filled : missed).push("title");
-    if (details?.place) (locationInput ? filled : missed).push("place");
-    if (details?.body) (body ? filled : missed).push("body");
+    (titleInput ? filled : missed).push("title");
+    (locationInput ? filled : missed).push("place");
+    (body ? filled : missed).push("body");
     try {
       await keys("owa-keys.attach");
-      if (titleInput) await replaceControl(titleInput, String(details.title));
-      if (locationInput) await replaceControl(locationInput, String(details.place).slice(0, 255));
-      if (body) await replaceControl(body, String(details.body));
-      return { ok: true, filled, missed };
+      const removed = await clearAttendees();
+      if (titleInput) await replaceControl(titleInput, String(details?.title || ""));
+      if (locationInput) await replaceControl(locationInput, String(details?.place || "").slice(0, 255));
+      if (body) await replaceControl(body, String(details?.body || ""));
+      return { ok: true, filled, missed, removed };
     } catch (error) {
       return { ok: false, reason: "error", error: error?.message || String(error) };
     } finally {

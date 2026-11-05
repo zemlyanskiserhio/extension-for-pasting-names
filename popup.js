@@ -196,7 +196,6 @@ function applyListMeeting(meeting) {
   meetPlace.value = saved.place;
   meetLink.value = saved.link;
   meetTemplate.value = saved.template;
-  ensureMeetingDefaults();
   scheduleMeetingSave();
 }
 
@@ -332,7 +331,9 @@ function renderKeys() {
     face.addEventListener("click", () => {
       confirmDeleteId = null;
       renamingId = null;
-      openId = openId === list.id ? null : list.id;
+      const selecting = openId !== list.id;
+      openId = selecting ? list.id : null;
+      if (selecting) loadList(list.id);
       renderKeys();
       keysEl.querySelector(".key.open")?.scrollIntoView({ block: "nearest" });
     });
@@ -344,16 +345,26 @@ function renderKeys() {
   syncEditingBar();
 }
 
-function editList(id) {
+function loadList(id) {
   const list = lists.find((item) => item.id === id);
   if (!list) return;
   editingId = id;
-  openId = id;
   namesEl.value = list.text;
   applyListMeeting(list.meeting);
   updateCount();
   saveDraft();
-  setLocalStatus(`Editing «${list.name}». Save stores the names and the meeting note.`);
+  setLocalStatus(
+    list.meeting
+      ? `Loaded «${list.name}» with its meeting note.`
+      : `Loaded «${list.name}». Save it to keep a meeting note with this list.`
+  );
+}
+
+function editList(id) {
+  const list = lists.find((item) => item.id === id);
+  if (!list) return;
+  openId = id;
+  loadList(id);
   renderKeys();
   namesEl.focus();
 }
