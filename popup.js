@@ -22,14 +22,17 @@ const editingBar = document.getElementById("editing");
 const editingName = document.getElementById("editingName");
 const editingSave = document.getElementById("editingSave");
 const editingClear = document.getElementById("editingClear");
+const meetTitle = document.getElementById("meetTitle");
 const meetPlace = document.getElementById("meetPlace");
 const meetLink = document.getElementById("meetLink");
 const meetTemplate = document.getElementById("meetTemplate");
 const meetPreview = document.getElementById("meetPreview");
+const fillMeet = document.getElementById("fillMeet");
 const copyMeet = document.getElementById("copyMeet");
 const resetMeet = document.getElementById("resetMeet");
 
-const DEFAULT_TEMPLATE = "📅 Встреча о том о сем\n\nял яля\n\n📍 {place}\n🔗 {link}";
+const DEFAULT_TITLE = "Встреча о том о сем";
+const DEFAULT_TEMPLATE = "ял яля";
 
 let lists = [];
 let openId = null;
@@ -406,29 +409,29 @@ async function createList() {
   renderKeys();
 }
 
-function meetingText() {
-  const place = meetPlace.value.trim();
+function meetingParts() {
+  const place = meetPlace.value.trim().slice(0, 255);
   const link = meetLink.value.trim();
   const source = meetTemplate.value.trim() ? meetTemplate.value : DEFAULT_TEMPLATE;
-  const hasTokens = /\{place\}|\{link\}/.test(source);
-  let text = source.replaceAll("{place}", place || "место встречи").replaceAll("{link}", link);
-  if (!hasTokens) {
-    const tail = [`📍 ${place || "место встречи"}`];
-    if (link) tail.push(`🔗 ${link}`);
-    text = `${text.trim()}\n\n${tail.join("\n")}`;
-  }
-  const cleaned = text.split("\n").flatMap((line) => {
-    const trimmed = line.trimEnd();
-    if (!link && /^\s*🔗\s*$/.test(trimmed.trim())) return [];
-    return [trimmed];
-  });
-  return cleaned.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  let body = source.replaceAll("{place}", place).replaceAll("{link}", link);
+  if (link && !source.includes("{link}") && !body.includes(link)) body = `${body.trim()}\n\n${link}`;
+  body = body.replace(/\n{3,}/g, "\n\n").trim();
+  return {
+    title: (meetTitle.value.trim() || DEFAULT_TITLE).slice(0, 255),
+    place,
+    body,
+  };
 }
 
 function renderPreview() {
-  const text = meetingText();
+  const parts = meetingParts();
+  const text = [
+    `Название — ${parts.title}`,
+    `Место — ${parts.place || "место встречи"}`,
+    `Тело —\n${parts.body || "ял яля"}`,
+  ].join("\n");
   meetPreview.textContent = text;
-  return text;
+  return parts;
 }
 
 function scheduleMeetingSave() {
@@ -437,6 +440,7 @@ function scheduleMeetingSave() {
   meetTimer = setTimeout(() => {
     storageSet({
       meeting: {
+        title: meetTitle.value,
         place: meetPlace.value,
         link: meetLink.value,
         template: meetTemplate.value,
@@ -448,6 +452,7 @@ function scheduleMeetingSave() {
 function applyMeeting(saved) {
   const meeting = saved && typeof saved === "object" ? saved : null;
   if (!meeting) return;
+  if (typeof meeting.title === "string") meetTitle.value = meeting.title;
   if (typeof meeting.place === "string") meetPlace.value = meeting.place;
   if (typeof meeting.link === "string") meetLink.value = meeting.link;
   if (typeof meeting.template === "string" && meeting.template.trim()) meetTemplate.value = meeting.template;
@@ -663,12 +668,51 @@ editingClear.addEventListener("click", () => {
   renderKeys();
 });
 
-for (const field of [meetPlace, meetLink, meetTemplate]) {
+for (const field of [meetTitle, meetPlace, meetLink, meetTemplate]) {
   field.addEventListener("input", scheduleMeetingSave);
 }
 
+fillMeet.addEventListener("click", async () => {
+  const parts = renderPreview();
+  fillMeet.disabled = true;
+  setLocalStatus("Filling the meeting form…");
+  let tabId = 0;
+  try {
+    const tab = await activeTab();
+    tabId = tab.id;
+    await attachDebugger(tab.id);
+    await inject(tab.id);
+    const results = await callPage(
+      tab.id,
+      (details) => window.__owaFillMeeting?.(details) || { ok: false, reason: "not-loaded" },
+      [parts]
+    );
+    const hit = (results || []).map((entry) => entry.result).find((result) => result?.ok);
+    if (!hit) {
+      const reason = (results || []).map((entry) => entry.result?.reason).find(Boolean);
+      setLocalStatus(
+        reason === "busy"
+          ? "Already adding people on this page."
+          : "Open the meeting form first. The title, place, and body fields are not on this page."
+      );
+      return;
+    }
+    const filled = hit.filled || [];
+    const missed = hit.missed || [];
+    if (!filled.length) setLocalStatus("Nothing to put into the meeting form.");
+    else if (missed.length) setLocalStatus(`Filled ${filled.join(", ")}. Could not find ${missed.join(", ")}.`);
+    else setLocalStatus(`Filled ${filled.join(", ")}.`);
+  } catch (error) {
+    setLocalStatus(error.message);
+  } finally {
+    if (tabId) await detachDebugger(tabId);
+    fillMeet.disabled = false;
+  }
+});
+
 copyMeet.addEventListener("click", async () => {
-  const text = renderPreview();
+  const parts = renderPreview();
+  const text = [parts.title, parts.place, parts.body].filter(Boolean).join("\n\n");
   let copied = false;
   try {
     await navigator.clipboard.writeText(text);
@@ -699,6 +743,7 @@ copyMeet.addEventListener("click", async () => {
 });
 
 resetMeet.addEventListener("click", () => {
+  meetTitle.value = DEFAULT_TITLE;
   meetTemplate.value = DEFAULT_TEMPLATE;
   scheduleMeetingSave();
   setLocalStatus("Template reset to the stub.");
@@ -730,6 +775,7 @@ document.addEventListener("keydown", (event) => {
   if (menuOpen) setMenuOpen(false);
 });
 
+if (!meetTitle.value.trim()) meetTitle.value = DEFAULT_TITLE;
 if (!meetTemplate.value.trim()) meetTemplate.value = DEFAULT_TEMPLATE;
 setMenuOpen(false);
 renderPreview();

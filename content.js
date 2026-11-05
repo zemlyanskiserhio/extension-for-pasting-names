@@ -550,6 +550,107 @@
     }
   }
 
+  function findTitleInput() {
+    const selectors = [
+      'input[aria-label="Добавьте название события"]',
+      'input[aria-label="Add a title"]',
+      'input[aria-label="Add title"]',
+      'input[aria-label="Add an event title"]',
+    ];
+    for (const selector of selectors) {
+      const found = [...document.querySelectorAll(selector)].find(isVisible);
+      if (found) return found;
+    }
+    return [...document.querySelectorAll("input[role='textbox']")].find((el) => {
+      if (!isVisible(el) || el.getAttribute("autoid") === "_lw_0") return false;
+      return /название события|event title|add a title|add title/i.test(el.getAttribute("aria-label") || "");
+    }) || null;
+  }
+
+  function findLocationInput() {
+    const selectors = [
+      'input[autoid="_lw_0"]',
+      'input[aria-labelledby="MeetingCompose.LocationInputLabel"]',
+    ];
+    for (const selector of selectors) {
+      const found = [...document.querySelectorAll(selector)].find(isVisible);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function findEventBody() {
+    const selectors = [
+      '[contenteditable="true"][aria-label="Тело события"]',
+      '[contenteditable="true"][aria-label="Event body"]',
+      '[contenteditable="true"][aria-label="Message body"]',
+    ];
+    for (const selector of selectors) {
+      const found = [...document.querySelectorAll(selector)].find(isVisible);
+      if (found) return found;
+    }
+    return [...document.querySelectorAll('[contenteditable="true"][role="textbox"]')].find((el) => {
+      if (!isVisible(el)) return false;
+      return /тело события|event body|message body/i.test(el.getAttribute("aria-label") || "");
+    }) || null;
+  }
+
+  function focusLanded(el) {
+    const active = document.activeElement;
+    return active === el || (!!active && el.contains(active));
+  }
+
+  async function replaceControl(el, text) {
+    await realClick(el);
+    await sleep(90);
+    if (!focusLanded(el)) {
+      el.focus();
+      await sleep(40);
+    }
+    if (focusLanded(el)) {
+      await keys("owa-keys.chord", { name: "selectAll" });
+      await keys("owa-keys.chord", { name: "backspace" });
+      await sleep(40);
+    }
+    if (text) await keys("owa-keys.paste", { text });
+    await sleep(80);
+    if (el.tagName === "INPUT" && text && !(el.value || "").includes(text.slice(0, Math.min(8, text.length)))) {
+      if (focusLanded(el)) {
+        await keys("owa-keys.chord", { name: "selectAll" });
+        await keys("owa-keys.chord", { name: "backspace" });
+      }
+      for (const char of Array.from(text)) await keys("owa-keys.char", { char });
+    }
+  }
+
+  window.__owaFillMeeting = async (details) => {
+    if (bus.state.running) return { ok: false, reason: "busy" };
+    const titleInput = details?.title ? findTitleInput() : null;
+    const locationInput = details?.place ? findLocationInput() : null;
+    const body = details?.body ? findEventBody() : null;
+    if (!titleInput && !locationInput && !body) return { ok: false, reason: "no-form" };
+    const filled = [];
+    const missed = [];
+    if (details?.title) (titleInput ? filled : missed).push("title");
+    if (details?.place) (locationInput ? filled : missed).push("place");
+    if (details?.body) (body ? filled : missed).push("body");
+    try {
+      await keys("owa-keys.attach");
+      if (titleInput) await replaceControl(titleInput, String(details.title));
+      if (locationInput) await replaceControl(locationInput, String(details.place).slice(0, 255));
+      if (body) await replaceControl(body, String(details.body));
+      return { ok: true, filled, missed };
+    } catch (error) {
+      return { ok: false, reason: "error", error: error?.message || String(error) };
+    } finally {
+      try {
+        await keys("owa-keys.detach");
+      } catch {
+        /* Banner already closed. */
+      }
+    }
+  };
+
   window.__owaBulkAddStart = (names, options) => {
     if (!findAddPeopleInput()) return { ok: false, reason: "no-input" };
     if (bus.state.running) return { ok: false, reason: "busy" };

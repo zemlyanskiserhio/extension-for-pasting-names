@@ -211,13 +211,19 @@ body {
   font-size: 11px;
 }
 
-#createSave, #copyMeet {
+#createSave, #fillMeet {
   background: #0f6cbd;
   color: #fff;
 }
 
 #createSave { width: 100%; }
-#createSave:disabled, #copyMeet:disabled { background: #a0c3e8; cursor: default; }
+#createSave:disabled, #fillMeet:disabled { background: #a0c3e8; cursor: default; }
+
+#copyMeet {
+  background: #fff;
+  color: #323130;
+  border: 1px solid #c8c6c4;
+}
 
 .key-add {
   flex-shrink: 0;
@@ -399,8 +405,8 @@ button {
   line-height: 1.45;
 }
 
-.meet-buttons { margin-top: 8px; }
-.meet-buttons #copyMeet { flex: 1; }
+.meet-buttons { margin-top: 8px; flex-wrap: wrap; }
+.meet-buttons #fillMeet { flex: 1; }
 
 #resetMeet {
   background: #fff;

@@ -50,21 +50,25 @@
 
       <details class="meet" open>
         <summary>📝 Meeting note</summary>
+        <label>📌 Title
+          <input id="meetTitle" type="text" maxlength="255" placeholder="Встреча о том о сем" spellcheck="false" autocomplete="off">
+        </label>
         <label>📍 Place
-          <input id="meetPlace" type="text" maxlength="300" placeholder="Переговорка «Орион», 12 этаж" spellcheck="false" autocomplete="off">
+          <input id="meetPlace" type="text" maxlength="255" placeholder="Переговорка «Орион», 12 этаж" spellcheck="false" autocomplete="off">
         </label>
         <label>🔗 Link
-          <input id="meetLink" type="text" maxlength="500" inputmode="url" placeholder="https://teams.microsoft.com/l/meetup-join/…" spellcheck="false" autocomplete="off">
+          <input id="meetLink" type="text" maxlength="500" inputmode="url" placeholder="https://alfabank.ktalk.ru/…" spellcheck="false" autocomplete="off">
         </label>
-        <label>✏️ Template
-          <textarea id="meetTemplate" rows="6" spellcheck="false"></textarea>
+        <label>✏️ Body
+          <textarea id="meetTemplate" rows="4" spellcheck="false"></textarea>
         </label>
-        <p class="hint">Replace the ял яля stub with the real agenda. <b>{place}</b> and <b>{link}</b> keep the place link at the end.</p>
+        <p class="hint">Title goes into «Добавьте название события», place into «Добавить место или помещение», and the body with the link at the end into «Тело события».</p>
         <div class="meet-label">👀 Preview</div>
         <div id="meetPreview" class="meet-preview" aria-live="polite"></div>
         <div class="buttons meet-buttons">
-          <button id="copyMeet" type="button">📋 Copy note</button>
-          <button id="resetMeet" type="button" title="Restore the stub template">↺ Stub</button>
+          <button id="fillMeet" type="button">Fill form</button>
+          <button id="copyMeet" type="button">📋 Copy</button>
+          <button id="resetMeet" type="button" title="Restore the stub">↺ Stub</button>
         </div>
       </details>
 
