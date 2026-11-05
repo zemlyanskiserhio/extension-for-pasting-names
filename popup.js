@@ -26,7 +26,6 @@ const meetTitle = document.getElementById("meetTitle");
 const meetPlace = document.getElementById("meetPlace");
 const meetLink = document.getElementById("meetLink");
 const meetTemplate = document.getElementById("meetTemplate");
-const meetPreview = document.getElementById("meetPreview");
 const fillMeet = document.getElementById("fillMeet");
 const copyMeet = document.getElementById("copyMeet");
 const resetMeet = document.getElementById("resetMeet");
@@ -198,7 +197,6 @@ function applyListMeeting(meeting) {
   meetLink.value = saved.link;
   meetTemplate.value = saved.template;
   ensureMeetingDefaults();
-  renderPreview();
   scheduleMeetingSave();
 }
 
@@ -480,14 +478,7 @@ function meetingParts() {
   };
 }
 
-function renderPreview() {
-  const parts = meetingParts();
-  meetPreview.textContent = parts.body;
-  return parts;
-}
-
 function scheduleMeetingSave() {
-  renderPreview();
   clearTimeout(meetTimer);
   meetTimer = setTimeout(() => {
     storageSet({
@@ -586,10 +577,12 @@ async function refreshStatus() {
     renderLog(status);
     const running = !!status?.running;
     startBtn.disabled = running;
+    fillMeet.disabled = running;
     stopBtn.disabled = !running;
   } catch (error) {
     setPageStatus(error.message);
     startBtn.disabled = false;
+    fillMeet.disabled = false;
     stopBtn.disabled = true;
   }
 }
@@ -599,16 +592,19 @@ function startPolling() {
   pollTimer = setInterval(refreshStatus, 400);
 }
 
-startBtn.addEventListener("click", async () => {
+async function startAdding() {
   const names = parseNames(namesEl.value);
   updateCount();
   if (!names.length) {
     setStatus("Paste at least one name.");
-    return;
+    startBtn.disabled = false;
+    fillMeet.disabled = false;
+    return false;
   }
   const pauseMs = Math.min(5000, Math.max(200, Number(pauseEl.value) || 600));
   pauseEl.value = String(pauseMs);
   startBtn.disabled = true;
+  fillMeet.disabled = true;
   setStatus("Starting…");
   let tabId = 0;
   try {
@@ -632,17 +628,23 @@ startBtn.addEventListener("click", async () => {
       );
       await detachDebugger(tabId);
       startBtn.disabled = false;
-      return;
+      fillMeet.disabled = false;
+      return false;
     }
     stopBtn.disabled = false;
     startPolling();
     await refreshStatus();
+    return true;
   } catch (error) {
     if (tabId) await detachDebugger(tabId);
     setStatus(error.message);
     startBtn.disabled = false;
+    fillMeet.disabled = false;
+    return false;
   }
-});
+}
+
+startBtn.addEventListener("click", () => startAdding());
 
 async function attachDebugger(tabId) {
   try {
@@ -725,9 +727,9 @@ for (const field of [meetTitle, meetPlace, meetLink, meetTemplate]) {
 }
 
 fillMeet.addEventListener("click", async () => {
-  const parts = renderPreview();
   fillMeet.disabled = true;
-  setLocalStatus("Filling the meeting form…");
+  startBtn.disabled = true;
+  setStatus("Filling the meeting form…");
   let tabId = 0;
   try {
     const tab = await activeTab();
@@ -737,33 +739,32 @@ fillMeet.addEventListener("click", async () => {
     const results = await callPage(
       tab.id,
       (details) => window.__owaFillMeeting?.(details) || { ok: false, reason: "not-loaded" },
-      [parts]
+      [meetingParts()]
     );
     const hit = (results || []).map((entry) => entry.result).find((result) => result?.ok);
-    if (!hit) {
-      const reason = (results || []).map((entry) => entry.result?.reason).find(Boolean);
-      setLocalStatus(
-        reason === "busy"
-          ? "Already adding people on this page."
-          : "Open the meeting form first. The title, place, and body fields are not on this page."
-      );
+    const reason = (results || []).map((entry) => entry.result?.reason).find(Boolean);
+    if (!hit && reason === "busy") {
+      setStatus("Already adding people on this page.");
+      stopBtn.disabled = false;
+      startPolling();
       return;
     }
-    const filled = hit.filled || [];
-    const missed = hit.missed || [];
-    if (!filled.length) setLocalStatus("Nothing to put into the meeting form.");
-    else if (missed.length) setLocalStatus(`Filled ${filled.join(", ")}. Could not find ${missed.join(", ")}.`);
-    else setLocalStatus(`Filled ${filled.join(", ")}.`);
+    if (!hit) {
+      setStatus("The meeting fields were not found. Adding people if the form is open.");
+    }
+    await detachDebugger(tabId);
+    tabId = 0;
+    await startAdding();
   } catch (error) {
-    setLocalStatus(error.message);
-  } finally {
     if (tabId) await detachDebugger(tabId);
+    setStatus(error.message);
+    startBtn.disabled = false;
     fillMeet.disabled = false;
   }
 });
 
 copyMeet.addEventListener("click", async () => {
-  const parts = renderPreview();
+  const parts = meetingParts();
   const text = [parts.title, parts.place, parts.body].filter(Boolean).join("\n\n");
   let copied = false;
   try {
@@ -831,7 +832,6 @@ document.addEventListener("keydown", (event) => {
 
 ensureMeetingDefaults();
 setMenuOpen(false);
-renderPreview();
 syncCreate();
 renderKeys();
 
@@ -843,6 +843,5 @@ storageGet(["draft", "pause", "lists", "meeting"]).then((saved) => {
   ensureMeetingDefaults();
   updateCount();
   renderKeys();
-  renderPreview();
   if (globalThis.chrome?.tabs) refreshStatus().then(startPolling);
 });

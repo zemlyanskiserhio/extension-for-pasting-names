@@ -384,27 +384,6 @@ button {
   font-size: 11px;
 }
 
-.meet-label {
-  margin-bottom: 4px;
-  color: #605e5c;
-  font-size: 12px;
-}
-
-.meet-preview {
-  margin: 0;
-  max-height: 140px;
-  overflow: auto;
-  padding: 8px 10px;
-  border: 1px solid #edebe9;
-  border-left: 3px solid #0f6cbd;
-  border-radius: 6px;
-  background: linear-gradient(#fff, #faf9f8);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
 .meet-buttons { margin-top: 8px; flex-wrap: wrap; }
 .meet-buttons #fillMeet { flex: 1; }
 
