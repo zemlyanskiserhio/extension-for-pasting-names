@@ -6,28 +6,70 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
-    <h1>Add participants</h1>
-    <p>Paste people separated by <b>;</b> or new lines. Outlook only searches after a real keystroke, so Chrome shows a debugging banner while this runs. Leave that banner alone until it finishes.</p>
-  </header>
+  <div class="app">
+    <aside class="piano" aria-label="Saved name lists">
+      <div class="piano-mark" id="pianoMark">🎹 Lists</div>
+      <div class="keys" id="keys"></div>
+      <div class="create" id="createBox" hidden>
+        <input id="createName" maxlength="40" placeholder="List name" spellcheck="false" autocomplete="off" aria-label="List name">
+        <p id="createMeta"></p>
+        <button id="createSave" type="button">💾 Save</button>
+      </div>
+      <button id="newList" type="button" class="key-add" title="Save the current names as a list">＋ Save list</button>
+    </aside>
 
-  <textarea id="names" rows="9" spellcheck="false" placeholder="Иванов Петр Сергеевич; Галкина Марина Викторовна; Василий Пушкин"></textarea>
+    <main>
+      <header>
+        <h1>Add participants</h1>
+        <p>Paste people separated by <b>;</b> or new lines. Outlook only searches after a real keystroke, so Chrome shows a debugging banner while this runs. Leave that banner alone until it finishes.</p>
+      </header>
 
-  <div class="row">
-    <label for="pause">Pause between people, ms</label>
-    <input id="pause" type="number" min="200" max="5000" step="100" value="600">
-    <span id="count">0 people</span>
+      <div class="editing" id="editing" hidden>
+        <span id="editingName">✏️</span>
+        <button id="editingSave" type="button" title="Save the main field into this list">💾</button>
+        <button id="editingClear" type="button" title="Stop editing this list">✕</button>
+      </div>
+
+      <textarea id="names" rows="8" spellcheck="false" placeholder="Иванов Петр Сергеевич; Галкина Марина Викторовна; Василий Пушкин"></textarea>
+
+      <div class="row">
+        <label for="pause">Pause between people, ms</label>
+        <input id="pause" type="number" min="200" max="5000" step="100" value="600">
+        <span id="count">0 people</span>
+      </div>
+
+      <div class="buttons">
+        <button id="start" type="button">Add one by one</button>
+        <button id="stop" type="button" disabled>Stop</button>
+      </div>
+
+      <p id="status" class="status">Waiting for the meeting page.</p>
+
+      <details class="meet" open>
+        <summary>📝 Meeting note</summary>
+        <label>📍 Place
+          <input id="meetPlace" type="text" maxlength="300" placeholder="Переговорка «Орион», 12 этаж" spellcheck="false" autocomplete="off">
+        </label>
+        <label>🔗 Link
+          <input id="meetLink" type="text" maxlength="500" inputmode="url" placeholder="https://teams.microsoft.com/l/meetup-join/…" spellcheck="false" autocomplete="off">
+        </label>
+        <label>✏️ Template
+          <textarea id="meetTemplate" rows="6" spellcheck="false"></textarea>
+        </label>
+        <p class="hint">Replace the ял яля stub with the real agenda. <b>{place}</b> and <b>{link}</b> keep the place link at the end.</p>
+        <div class="meet-label">👀 Preview</div>
+        <div id="meetPreview" class="meet-preview" aria-live="polite"></div>
+        <div class="buttons meet-buttons">
+          <button id="copyMeet" type="button">📋 Copy note</button>
+          <button id="resetMeet" type="button" title="Restore the stub template">↺ Stub</button>
+        </div>
+      </details>
+
+      <label id="problemLabel" hidden>Problematic names, ready to copy</label>
+      <textarea id="problems" rows="4" readonly hidden spellcheck="false"></textarea>
+      <ol id="log"></ol>
+    </main>
   </div>
-
-  <div class="buttons">
-    <button id="start" type="button">Add one by one</button>
-    <button id="stop" type="button" disabled>Stop</button>
-  </div>
-
-  <p id="status" class="status">Waiting for the meeting page.</p>
-  <label id="problemLabel" hidden>Problematic names, ready to copy</label>
-  <textarea id="problems" rows="4" readonly hidden spellcheck="false"></textarea>
-  <ol id="log"></ol>
   <script src="popup.js"></script>
 </body>
 </html>
