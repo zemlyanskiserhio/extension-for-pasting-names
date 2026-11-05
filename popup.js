@@ -827,6 +827,29 @@ function sharePassphrase() {
   return sharePassEl.value;
 }
 
+function githubToken() {
+  return githubTokenEl.value.trim().replace(/^(bearer|token)\s+/i, "");
+}
+
+async function githubFailure(response, fallback) {
+  let detail = "";
+  try {
+    const body = await response.json();
+    if (body && typeof body.message === "string") detail = body.message;
+  } catch (error) {
+    detail = "";
+  }
+  if (response.status === 401) {
+    return new Error("GitHub refused that token. Use a personal access token that starts with ghp_ or github_pat_.");
+  }
+  if (response.status === 403) {
+    return new Error(detail
+      ? `This token cannot change the repository. ${detail}`
+      : "This token cannot change the repository. Give it Contents read and write.");
+  }
+  return new Error(detail ? `${fallback} ${detail}` : fallback);
+}
+
 function rememberShareSecret() {
   return storageSet({ sharePass: sharePassEl.value, githubToken: githubTokenEl.value });
 }
@@ -886,7 +909,7 @@ pullTemplatesBtn.addEventListener("click", async () => {
 });
 
 publishTemplatesBtn.addEventListener("click", async () => {
-  const token = githubTokenEl.value.trim();
+  const token = githubToken();
   const passphrase = sharePassphrase();
   if (passphrase.length < 8) {
     setLocalStatus("Choose a passphrase of at least 8 characters, then tell it only to them.");
@@ -910,7 +933,7 @@ publishTemplatesBtn.addEventListener("click", async () => {
     const current = await fetch(`https://api.github.com/repos/${SHARED_REPO}/contents/${SHARED_PATH}`, { headers });
     let sha;
     if (current.ok) sha = (await current.json()).sha;
-    else if (current.status !== 404) throw new Error("GitHub did not accept the token.");
+    else if (current.status !== 404) throw await githubFailure(current, "GitHub did not accept the token.");
     const saved = await fetch(`https://api.github.com/repos/${SHARED_REPO}/contents/${SHARED_PATH}`, {
       method: "PUT",
       headers,
@@ -920,7 +943,7 @@ publishTemplatesBtn.addEventListener("click", async () => {
         sha,
       }),
     });
-    if (!saved.ok) throw new Error("GitHub rejected the publish.");
+    if (!saved.ok) throw await githubFailure(saved, "GitHub rejected the publish.");
     setLocalStatus("Published. Send them the passphrase, not the file.");
   } catch (error) {
     setLocalStatus(error instanceof Error ? error.message : "Could not publish the templates.");
