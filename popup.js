@@ -29,6 +29,13 @@ const meetTemplate = document.getElementById("meetTemplate");
 const fillMeet = document.getElementById("fillMeet");
 const copyMeet = document.getElementById("copyMeet");
 const resetMeet = document.getElementById("resetMeet");
+const pullTemplatesBtn = document.getElementById("pullTemplates");
+const publishTemplatesBtn = document.getElementById("publishTemplates");
+const githubTokenEl = document.getElementById("githubToken");
+
+const SHARED_REPO = "zemlyanskiserhio/extension-for-pasting-names";
+const SHARED_PATH = "shared/templates.enc.json";
+const SHARED_RAW = `https://raw.githubusercontent.com/${SHARED_REPO}/main/${SHARED_PATH}`;
 
 const DEFAULT_TITLE = "Встреча о том о сем";
 const DEFAULT_LINK = "https://alfabank.ktalk.ru/zemlyanskiy";
@@ -815,6 +822,79 @@ resetMeet.addEventListener("click", () => {
   setLocalStatus("Template reset to the stub.");
 });
 
+function utf8ToBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  const size = 0x8000;
+  for (let index = 0; index < bytes.length; index += size) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + size));
+  }
+  return btoa(binary);
+}
+
+pullTemplatesBtn.addEventListener("click", async () => {
+  pullTemplatesBtn.disabled = true;
+  setLocalStatus("Pulling shared templates…");
+  try {
+    const response = await fetch(`${SHARED_RAW}?t=${Date.now()}`);
+    if (!response.ok) throw new Error("The shared templates file is not on GitHub yet.");
+    const payload = await Vault.decryptVault(await response.json());
+    const incoming = sanitizeLists(payload.lists);
+    const byId = new Map(lists.map((list) => [list.id, list]));
+    for (const list of incoming) byId.set(list.id, list);
+    lists = [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+    await persistLists();
+    if (payload.meeting) applyListMeeting(payload.meeting);
+    setMenuOpen(true);
+    renderKeys();
+    setLocalStatus(incoming.length === 1
+      ? "Pulled 1 shared list."
+      : `Pulled ${incoming.length} shared lists.`);
+  } catch (error) {
+    setLocalStatus(error instanceof Error ? error.message : "Could not pull the templates.");
+  } finally {
+    pullTemplatesBtn.disabled = false;
+  }
+});
+
+publishTemplatesBtn.addEventListener("click", async () => {
+  const token = githubTokenEl.value.trim();
+  if (!token) {
+    setLocalStatus("Paste a GitHub token to publish. Pull works without one.");
+    return;
+  }
+  publishTemplatesBtn.disabled = true;
+  setLocalStatus("Publishing the ciphered copy…");
+  try {
+    await storageSet({ githubToken: token });
+    const packed = await Vault.encryptVault({ lists, meeting: currentMeeting() });
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+    };
+    const current = await fetch(`https://api.github.com/repos/${SHARED_REPO}/contents/${SHARED_PATH}`, { headers });
+    let sha;
+    if (current.ok) sha = (await current.json()).sha;
+    else if (current.status !== 404) throw new Error("GitHub did not accept the token.");
+    const saved = await fetch(`https://api.github.com/repos/${SHARED_REPO}/contents/${SHARED_PATH}`, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        message: "Update shared meeting templates",
+        content: utf8ToBase64(`${JSON.stringify(packed, null, 2)}\n`),
+        sha,
+      }),
+    });
+    if (!saved.ok) throw new Error("GitHub rejected the publish.");
+    setLocalStatus("Published the ciphered templates.");
+  } catch (error) {
+    setLocalStatus(error instanceof Error ? error.message : "Could not publish the templates.");
+  } finally {
+    publishTemplatesBtn.disabled = false;
+  }
+});
+
 function setMenuOpen(open) {
   menuOpen = open;
   appEl.classList.toggle("menu-open", open);
@@ -846,9 +926,10 @@ setMenuOpen(false);
 syncCreate();
 renderKeys();
 
-storageGet(["draft", "pause", "lists", "meeting"]).then((saved) => {
+storageGet(["draft", "pause", "lists", "meeting", "githubToken"]).then((saved) => {
   if (typeof saved.draft === "string") namesEl.value = saved.draft;
   if (saved.pause) pauseEl.value = String(saved.pause);
+  if (typeof saved.githubToken === "string") githubTokenEl.value = saved.githubToken;
   lists = sanitizeLists(saved.lists);
   applyMeeting(saved.meeting);
   ensureMeetingDefaults();

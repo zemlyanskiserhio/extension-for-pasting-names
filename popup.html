@@ -18,6 +18,12 @@
           <button id="createSave" type="button">💾 Save</button>
         </div>
         <button id="newList" type="button" class="key-add" title="Save the current names as a list">＋ Save list</button>
+        <button id="pullTemplates" type="button" class="key-pull" title="Download the shared lists and meeting notes">↓ Pull templates</button>
+        <details class="publish">
+          <summary>Publish</summary>
+          <input id="githubToken" type="password" placeholder="GitHub token, stays on this computer" autocomplete="off" spellcheck="false">
+          <button id="publishTemplates" type="button">Publish ciphered copy</button>
+        </details>
       </div>
     </aside>
 
@@ -75,6 +81,7 @@
       <ol id="log"></ol>
     </main>
   </div>
+  <script src="vault.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
