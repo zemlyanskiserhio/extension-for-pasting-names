@@ -147,6 +147,7 @@ function sanitizeLists(raw) {
       id: item.id,
       name: String(item.name || "List").replace(/\s+/g, " ").trim().slice(0, 40) || "List",
       text: String(item.text),
+      meeting: snapshotMeeting(item.meeting),
       createdAt: Number(item.createdAt) || Date.now(),
       updatedAt: Number(item.updatedAt) || Date.now(),
     }))
@@ -169,12 +170,56 @@ function persistLists() {
   return storageSet({ lists });
 }
 
+function snapshotMeeting(raw) {
+  const source = raw && typeof raw === "object" ? raw : null;
+  if (!source) return null;
+  return {
+    title: typeof source.title === "string" ? source.title : "",
+    place: typeof source.place === "string" ? source.place : "",
+    link: typeof source.link === "string" ? source.link : "",
+    template: typeof source.template === "string" ? source.template : "",
+  };
+}
+
+function currentMeeting() {
+  return {
+    title: meetTitle.value,
+    place: meetPlace.value,
+    link: meetLink.value,
+    template: meetTemplate.value,
+  };
+}
+
+function applyListMeeting(meeting) {
+  const saved = snapshotMeeting(meeting);
+  if (!saved) return;
+  meetTitle.value = saved.title;
+  meetPlace.value = saved.place;
+  meetLink.value = saved.link;
+  meetTemplate.value = saved.template;
+  ensureMeetingDefaults();
+  renderPreview();
+  scheduleMeetingSave();
+}
+
+function withoutRepeatedLink(text, link) {
+  if (!link) return text;
+  let kept = false;
+  return text.split("\n").filter((line) => {
+    const bare = line.replace(/^[\s📅📍🔗.—-]+/u, "").trim();
+    if (bare !== link) return true;
+    if (kept) return false;
+    kept = true;
+    return true;
+  }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function syncCreate() {
   createBox.hidden = !creating;
   newListBtn.textContent = creating ? "✕ Cancel" : "＋ Save list";
   const count = parseNames(namesEl.value).length;
   createMeta.textContent = count
-    ? `Saves ${peopleLabel(count)} from the field.`
+    ? `Saves ${peopleLabel(count)} and the meeting note.`
     : "The field is empty.";
   createSave.disabled = count === 0;
 }
@@ -197,12 +242,12 @@ function buildKeyBody(list) {
   const count = parseNames(list.text).length;
   body.append(
     el("p", "key-meta", `${peopleLabel(count)} · ${savedLabel(list)}`),
-    el("p", "key-hint", "Save stores the names field in this list."),
+    el("p", "key-hint", "Save stores the names and the meeting note."),
     el("p", "key-preview", list.text.trim())
   );
   const crud = el("div", "crud");
   const editingThis = editingId === list.id;
-  const saveButton = miniButton("💾 Save", "Save the main field into this list", () => saveInto(list.id));
+  const saveButton = miniButton("💾 Save", "Save the names and the meeting note into this list", () => saveInto(list.id));
   if (editingThis) saveButton.classList.add("accent");
   const deleteButton = miniButton(
     confirmDeleteId === list.id ? "✓ Yes" : "🗑️ Delete",
@@ -216,7 +261,7 @@ function buildKeyBody(list) {
   crud.append(
     miniButton(
       editingThis ? "✏️ Editing" : "✏️ Edit",
-      "Load this list into the main field",
+      "Load these names and the meeting note",
       () => editList(list.id)
     ),
     miniButton("🏷 Rename", "Rename this list", () => {
@@ -307,9 +352,10 @@ function editList(id) {
   editingId = id;
   openId = id;
   namesEl.value = list.text;
+  applyListMeeting(list.meeting);
   updateCount();
   saveDraft();
-  setLocalStatus(`Editing «${list.name}». Change the field, then Save.`);
+  setLocalStatus(`Editing «${list.name}». Save stores the names and the meeting note.`);
   renderKeys();
   namesEl.focus();
 }
@@ -323,6 +369,7 @@ async function saveInto(id) {
     return;
   }
   list.text = namesEl.value;
+  list.meeting = currentMeeting();
   list.updatedAt = Date.now();
   editingId = id;
   try {
@@ -392,6 +439,7 @@ async function createList() {
     id: uid(),
     name,
     text: namesEl.value,
+    meeting: currentMeeting(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -424,7 +472,7 @@ function meetingParts() {
   const source = meetTemplate.value.trim() ? meetTemplate.value : DEFAULT_TEMPLATE;
   let body = source.replaceAll("{place}", place).replaceAll("{link}", link);
   if (link && !body.includes(link)) body = `${body.trim()}\n\n${link}`;
-  body = body.replace(/\n{3,}/g, "\n\n").trim();
+  body = withoutRepeatedLink(body, link);
   return {
     title: (meetTitle.value.trim() || DEFAULT_TITLE).slice(0, 255),
     place,
@@ -434,12 +482,7 @@ function meetingParts() {
 
 function renderPreview() {
   const parts = meetingParts();
-  const text = [
-    `Название — ${parts.title}`,
-    `Место — ${parts.place || "место встречи"}`,
-    `Тело —\n${parts.body || "ял яля"}`,
-  ].join("\n");
-  meetPreview.textContent = text;
+  meetPreview.textContent = parts.body;
   return parts;
 }
 
