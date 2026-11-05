@@ -1,0 +1,100 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  width: 380px;
+  padding: 14px 14px 12px;
+  font: 13px/1.4 "Segoe UI", sans-serif;
+  color: #1b1a19;
+  background: #f5f5f5;
+}
+
+header h1 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+header p {
+  margin: 0 0 10px;
+  color: #605e5c;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 140px;
+  padding: 8px;
+  border: 1px solid #c8c6c4;
+  border-radius: 4px;
+  font: 12px/1.45 Consolas, "Segoe UI", sans-serif;
+  background: #fff;
+}
+
+textarea:focus, input:focus, button:focus-visible {
+  outline: 2px solid #0f6cbd;
+  outline-offset: 1px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.row label { color: #605e5c; flex: 1; }
+
+.row input[type="number"] {
+  width: 72px;
+  padding: 4px 6px;
+  border: 1px solid #c8c6c4;
+  border-radius: 4px;
+}
+
+#count {
+  min-width: 72px;
+  text-align: right;
+  color: #323130;
+  font-variant-numeric: tabular-nums;
+}
+
+.buttons { display: flex; gap: 8px; }
+
+button {
+  border: 0;
+  border-radius: 4px;
+  padding: 7px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+#start { background: #0f6cbd; color: #fff; }
+#start:disabled { background: #a0c3e8; cursor: default; }
+#stop { background: #fff; color: #323130; border: 1px solid #c8c6c4; }
+#stop:disabled { color: #a19f9d; cursor: default; }
+
+.status { margin: 10px 0 4px; min-height: 1.4em; }
+
+#problemLabel {
+  display: block;
+  margin-top: 8px;
+  color: #605e5c;
+}
+
+#problems {
+  min-height: 72px;
+  margin-top: 4px;
+}
+
+#log {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 240px;
+  overflow: auto;
+  color: #605e5c;
+}
+
+#log li { margin: 2px 0; }
+#log li.bad { color: #a4262c; }
+#log li.ok { color: #0b6a0b; }
