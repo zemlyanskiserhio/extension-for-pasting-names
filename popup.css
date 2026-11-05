@@ -257,14 +257,21 @@ body {
 
 .publish summary { cursor: pointer; }
 
-.publish input {
+.share-pass, .publish input {
   width: 100%;
-  margin-top: 6px;
   padding: 4px 6px;
   border: 1px solid #c8c6c4;
   border-radius: 4px;
   font: inherit;
 }
+
+.share-pass {
+  flex-shrink: 0;
+  margin: 0 10px 8px;
+  width: calc(100% - 20px);
+}
+
+.publish input { margin-top: 6px; }
 
 #publishTemplates {
   width: 100%;

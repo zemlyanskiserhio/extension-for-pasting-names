@@ -18,7 +18,8 @@
           <button id="createSave" type="button">💾 Save</button>
         </div>
         <button id="newList" type="button" class="key-add" title="Save the current names as a list">＋ Save list</button>
-        <button id="pullTemplates" type="button" class="key-pull" title="Download the shared lists and meeting notes">↓ Pull templates</button>
+        <input id="sharePass" class="share-pass" type="password" placeholder="Passphrase, only for people you tell" autocomplete="off" spellcheck="false" aria-label="Passphrase for the shared lists">
+        <button id="pullTemplates" type="button" class="key-pull" title="Download the lists. Only this passphrase can open them.">↓ Pull templates</button>
         <details class="publish">
           <summary>Publish</summary>
           <input id="githubToken" type="password" placeholder="GitHub token, stays on this computer" autocomplete="off" spellcheck="false">

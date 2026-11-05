@@ -3,8 +3,6 @@
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.Vault = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const SHARED_PASSWORD = "owa-participants-shared-v1";
-
   function bytesToBase64(bytes) {
     let binary = "";
     const size = 0x8000;
@@ -21,10 +19,10 @@
     return bytes;
   }
 
-  async function deriveKey(salt) {
+  async function deriveKey(password, salt) {
     const material = await crypto.subtle.importKey(
       "raw",
-      new TextEncoder().encode(SHARED_PASSWORD),
+      new TextEncoder().encode(password),
       "PBKDF2",
       false,
       ["deriveKey"]
@@ -38,10 +36,10 @@
     );
   }
 
-  async function encryptVault(payload) {
+  async function encryptVault(payload, password) {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await deriveKey(salt);
+    const key = await deriveKey(password, salt);
     const cipher = new Uint8Array(await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
@@ -56,11 +54,11 @@
     };
   }
 
-  async function decryptVault(packed) {
+  async function decryptVault(packed, password) {
     if (!packed || packed.v !== 1 || packed.alg !== "AES-GCM") {
       throw new Error("This shared file is not a templates vault.");
     }
-    const key = await deriveKey(base64ToBytes(packed.salt));
+    const key = await deriveKey(password, base64ToBytes(packed.salt));
     const plain = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: base64ToBytes(packed.iv) },
       key,

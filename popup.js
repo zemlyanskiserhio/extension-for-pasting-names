@@ -32,6 +32,7 @@ const resetMeet = document.getElementById("resetMeet");
 const pullTemplatesBtn = document.getElementById("pullTemplates");
 const publishTemplatesBtn = document.getElementById("publishTemplates");
 const githubTokenEl = document.getElementById("githubToken");
+const sharePassEl = document.getElementById("sharePass");
 
 const SHARED_REPO = "zemlyanskiserhio/extension-for-pasting-names";
 const SHARED_PATH = "shared/templates.enc.json";
@@ -822,6 +823,18 @@ resetMeet.addEventListener("click", () => {
   setLocalStatus("Template reset to the stub.");
 });
 
+function sharePassphrase() {
+  return sharePassEl.value;
+}
+
+function rememberShareSecret() {
+  return storageSet({ sharePass: sharePassEl.value, githubToken: githubTokenEl.value });
+}
+
+sharePassEl.addEventListener("change", () => {
+  storageSet({ sharePass: sharePassEl.value });
+});
+
 function utf8ToBase64(text) {
   const bytes = new TextEncoder().encode(text);
   let binary = "";
@@ -833,12 +846,27 @@ function utf8ToBase64(text) {
 }
 
 pullTemplatesBtn.addEventListener("click", async () => {
+  const passphrase = sharePassphrase();
+  if (passphrase.length < 8) {
+    setLocalStatus("Enter the passphrase they gave you. At least 8 characters.");
+    sharePassEl.focus();
+    return;
+  }
   pullTemplatesBtn.disabled = true;
   setLocalStatus("Pulling shared templates…");
   try {
+    await rememberShareSecret();
     const response = await fetch(`${SHARED_RAW}?t=${Date.now()}`);
     if (!response.ok) throw new Error("The shared templates file is not on GitHub yet.");
-    const payload = await Vault.decryptVault(await response.json());
+    let payload;
+    try {
+      payload = await Vault.decryptVault(await response.json(), passphrase);
+    } catch (error) {
+      if (error && (error.name === "OperationError" || error.name === "InvalidAccessError")) {
+        throw new Error("That passphrase does not open the shared lists.");
+      }
+      throw error;
+    }
     const incoming = sanitizeLists(payload.lists);
     const byId = new Map(lists.map((list) => [list.id, list]));
     for (const list of incoming) byId.set(list.id, list);
@@ -859,15 +887,21 @@ pullTemplatesBtn.addEventListener("click", async () => {
 
 publishTemplatesBtn.addEventListener("click", async () => {
   const token = githubTokenEl.value.trim();
+  const passphrase = sharePassphrase();
+  if (passphrase.length < 8) {
+    setLocalStatus("Choose a passphrase of at least 8 characters, then tell it only to them.");
+    sharePassEl.focus();
+    return;
+  }
   if (!token) {
-    setLocalStatus("Paste a GitHub token to publish. Pull works without one.");
+    setLocalStatus("Paste a GitHub token to publish. They only need the passphrase to pull.");
     return;
   }
   publishTemplatesBtn.disabled = true;
   setLocalStatus("Publishing the ciphered copy…");
   try {
-    await storageSet({ githubToken: token });
-    const packed = await Vault.encryptVault({ lists, meeting: currentMeeting() });
+    await rememberShareSecret();
+    const packed = await Vault.encryptVault({ lists, meeting: currentMeeting() }, passphrase);
     const headers = {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
@@ -887,7 +921,7 @@ publishTemplatesBtn.addEventListener("click", async () => {
       }),
     });
     if (!saved.ok) throw new Error("GitHub rejected the publish.");
-    setLocalStatus("Published the ciphered templates.");
+    setLocalStatus("Published. Send them the passphrase, not the file.");
   } catch (error) {
     setLocalStatus(error instanceof Error ? error.message : "Could not publish the templates.");
   } finally {
@@ -926,10 +960,11 @@ setMenuOpen(false);
 syncCreate();
 renderKeys();
 
-storageGet(["draft", "pause", "lists", "meeting", "githubToken"]).then((saved) => {
+storageGet(["draft", "pause", "lists", "meeting", "githubToken", "sharePass"]).then((saved) => {
   if (typeof saved.draft === "string") namesEl.value = saved.draft;
   if (saved.pause) pauseEl.value = String(saved.pause);
   if (typeof saved.githubToken === "string") githubTokenEl.value = saved.githubToken;
+  if (typeof saved.sharePass === "string") sharePassEl.value = saved.sharePass;
   lists = sanitizeLists(saved.lists);
   applyMeeting(saved.meeting);
   ensureMeetingDefaults();
