@@ -159,6 +159,40 @@
     await keys("owa-keys.click", point);
   }
 
+  function caretToEnd(input) {
+    input.focus();
+    const length = (input.value || "").length;
+    if (typeof input.setSelectionRange === "function") input.setSelectionRange(length, length);
+  }
+
+  function withoutLast(text) {
+    const chars = Array.from(text);
+    chars.pop();
+    return chars.join("");
+  }
+
+  async function waitForField(input, ready, timeoutMs) {
+    const deadline = Date.now() + timeoutMs;
+    let value = input.value || "";
+    while (Date.now() < deadline) {
+      value = input.value || "";
+      if (ready(value)) return value;
+      await sleep(30);
+    }
+    return input.value || "";
+  }
+
+  async function replaceField(input, text) {
+    for (let attempt = 0; attempt < 2 && (input.value || "") !== text; attempt += 1) {
+      caretToEnd(input);
+      await keys("owa-keys.chord", { name: "selectAll" });
+      await sleep(30);
+      if (text) await keys("owa-keys.paste", { text });
+      else await keys("owa-keys.chord", { name: "backspace" });
+      await waitForField(input, (value) => value === text, 300);
+    }
+  }
+
   async function prepareField(input) {
     await realClick(input);
     await sleep(70);
@@ -166,26 +200,45 @@
     await sleep(40);
     await realClick(input);
     await sleep(70);
-    await keys("owa-keys.chord", { name: "selectAll" });
-    await keys("owa-keys.chord", { name: "backspace" });
-    await sleep(40);
-    const leftover = Math.min((input.value || "").length + 1, 80);
-    for (let index = 0; index < leftover && input.value; index += 1) {
+    for (let attempt = 0; attempt < 3 && input.value; attempt += 1) {
       if (bus.abort) return;
+      await replaceField(input, "");
+    }
+    let guard = 0;
+    while (input.value && guard < 80) {
+      if (bus.abort) return;
+      const before = input.value;
+      caretToEnd(input);
       await keys("owa-keys.chord", { name: "backspace" });
+      await sleep(25);
+      const removed = before.length - (input.value || "").length;
+      if (removed !== 1) break;
+      guard += 1;
     }
   }
 
   async function pasteName(input, text) {
+    const head = withoutLast(text);
+    const last = Array.from(text).pop() || "";
     await keys("owa-keys.paste", { text });
-    await sleep(120);
-    await realClick(input);
-    await sleep(60);
-    const last = Array.from(text).pop();
-    if (!last) return;
+    let landed = await waitForField(input, (value) => value.trim() === text, 400);
+    if (landed.trim() !== text) {
+      await replaceField(input, text);
+      landed = input.value || "";
+    }
+    caretToEnd(input);
+    await keys("owa-keys.chord", { name: "end" });
+    await sleep(20);
+    caretToEnd(input);
+    const before = input.value || "";
     await keys("owa-keys.chord", { name: "backspace" });
-    await sleep(40);
+    const after = await waitForField(input, (value) => value !== before, 250);
+    if (after !== head) await replaceField(input, head);
+    if (!last) return;
+    caretToEnd(input);
     await keys("owa-keys.char", { char: last });
+    const typed = await waitForField(input, (value) => value === text, 250);
+    if (typed === head) await keys("owa-keys.char", { char: last });
   }
 
   function rowText(el) {

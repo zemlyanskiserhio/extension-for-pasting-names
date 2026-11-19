@@ -5,7 +5,15 @@ const CHORDS = {
   enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 },
   escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
   selectAll: { key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 2 },
+  end: { key: "End", code: "End", windowsVirtualKeyCode: 35 },
 };
+
+const MODIFIERS = [
+  { key: "Shift", code: "ShiftLeft", windowsVirtualKeyCode: 16 },
+  { key: "Control", code: "ControlLeft", windowsVirtualKeyCode: 17 },
+  { key: "Alt", code: "AltLeft", windowsVirtualKeyCode: 18 },
+  { key: "Meta", code: "MetaLeft", windowsVirtualKeyCode: 91 },
+];
 
 async function attach(tabId) {
   try {
@@ -21,6 +29,19 @@ async function dispatch(tabId, method, params) {
   return chrome.debugger.sendCommand({ tabId }, method, params);
 }
 
+async function releaseModifiers(tabId) {
+  for (const modifier of MODIFIERS) {
+    await dispatch(tabId, "Input.dispatchKeyEvent", {
+      type: "keyUp",
+      key: modifier.key,
+      code: modifier.code,
+      windowsVirtualKeyCode: modifier.windowsVirtualKeyCode,
+      nativeVirtualKeyCode: modifier.windowsVirtualKeyCode,
+      modifiers: 0,
+    });
+  }
+}
+
 async function chord(tabId, name) {
   const spec = CHORDS[name];
   if (!spec) throw new Error(`Unknown key: ${name}`);
@@ -32,7 +53,8 @@ async function chord(tabId, name) {
     modifiers: spec.modifiers || 0,
   };
   await dispatch(tabId, "Input.dispatchKeyEvent", { type: "rawKeyDown", ...base });
-  await dispatch(tabId, "Input.dispatchKeyEvent", { type: "keyUp", ...base });
+  await dispatch(tabId, "Input.dispatchKeyEvent", { type: "keyUp", ...base, modifiers: 0 });
+  await releaseModifiers(tabId);
 }
 
 async function typeChar(tabId, char) {
