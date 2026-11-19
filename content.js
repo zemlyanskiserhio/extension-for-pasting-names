@@ -678,6 +678,74 @@
     }
   };
 
+  function openedMessage() {
+    const panes = [...document.querySelectorAll('[role="region"]')].filter((el) => {
+      return /панель чтения|reading pane/i.test(el.getAttribute("aria-label") || "");
+    });
+    const root = panes.find(isVisible) || document.querySelector("._rp_k") || document.body;
+    const expanded = [...root.querySelectorAll(
+      '[aria-label="Развернутое содержимое сообщения"], [aria-label="Expanded message content"], [aria-label="Expanded message contents"]'
+    )].find(isVisible);
+    if (expanded) return expanded;
+    return [...root.querySelectorAll('[aria-selected="true"]')].find(isVisible) || null;
+  }
+
+  function cleanRecipient(text) {
+    return String(text || "").replace(/\s+/g, " ").replace(/[;,\s]+$/g, "").trim();
+  }
+
+  function recipientNames(root) {
+    const wells = [...root.querySelectorAll("[id], [aria-label]")].filter((el) => {
+      if (el.id === "ItemHeader.ToContainer" || el.id === "ItemHeader.CcContainer") return true;
+      return /^(получатели|recipients)\b/i.test(el.getAttribute("aria-label") || "");
+    });
+    const names = [];
+    for (const well of wells) {
+      for (const chip of well.querySelectorAll('[autoid="_pe_b"]')) {
+        const name = cleanRecipient(chip.textContent);
+        if (name.length > 1 && !names.includes(name)) names.push(name);
+      }
+    }
+    return names;
+  }
+
+  function moreRecipientsButton(root) {
+    return [...root.querySelectorAll("button")].find((button) => {
+      if (!isVisible(button)) return false;
+      const label = `${button.getAttribute("aria-label") || ""} ${button.getAttribute("title") || ""}`;
+      return /другие получатели|more recipients/i.test(label) || /(^|\s)(больше|more)(\s|$)/i.test(label);
+    }) || null;
+  }
+
+  async function expandRecipients(root) {
+    for (let guard = 0; guard < 8; guard += 1) {
+      const button = moreRecipientsButton(root);
+      if (!button) return;
+      const before = recipientNames(root).length;
+      button.click();
+      const deadline = Date.now() + 700;
+      while (Date.now() < deadline && recipientNames(root).length <= before) await sleep(70);
+      if (recipientNames(root).length <= before) {
+        try {
+          await realClick(button);
+          await sleep(200);
+        } catch {
+          return;
+        }
+      }
+      if (recipientNames(root).length <= before) return;
+    }
+  }
+
+  window.__owaGrabRecipients = async () => {
+    const message = openedMessage();
+    if (!message) return { ok: false, reason: "no-mail" };
+    await expandRecipients(message);
+    const names = recipientNames(message);
+    if (!names.length) return { ok: false, reason: "no-recipients" };
+    return { ok: true, names };
+  };
+
   window.__owaBulkAddStart = (names, options) => {
     if (!findAddPeopleInput()) return { ok: false, reason: "no-input" };
     if (bus.state.running) return { ok: false, reason: "busy" };

@@ -337,6 +337,16 @@ textarea {
   background: #fff;
 }
 
+.mail-pack {
+  width: 100%;
+  margin: 0 0 6px;
+  background: #fff;
+  color: #0f6cbd;
+  border: 1px solid #0f6cbd;
+}
+
+.mail-pack:disabled { color: #a19f9d; border-color: #c8c6c4; cursor: default; }
+
 #names { min-height: 120px; }
 textarea.is-editing { border-color: #0f6cbd; }
 

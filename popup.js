@@ -1,3 +1,4 @@
+const mailPackBtn = document.getElementById("mailPack");
 const namesEl = document.getElementById("names");
 const pauseEl = document.getElementById("pause");
 const countEl = document.getElementById("count");
@@ -43,6 +44,7 @@ const DEFAULT_LINK = "https://alfabank.ktalk.ru/zemlyanskiy";
 const DEFAULT_TEMPLATE = "ял яля";
 
 let lists = [];
+let packedNames = [];
 let openId = null;
 let editingId = null;
 let renamingId = null;
@@ -546,6 +548,16 @@ async function callPage(tabId, func, args) {
   }
 }
 
+function syncMailPack() {
+  mailPackBtn.textContent = packedNames.length ? `📬 Recipients · ${packedNames.length}` : "📬 Recipients";
+}
+
+function setBusy(busy) {
+  startBtn.disabled = busy;
+  fillMeet.disabled = busy;
+  mailPackBtn.disabled = busy;
+}
+
 function bestStatus(results) {
   const list = (results || []).map((entry) => entry.result).filter(Boolean);
   return (
@@ -595,13 +607,11 @@ async function refreshStatus() {
     setPageStatus(describe(status));
     renderLog(status);
     const running = !!status?.running;
-    startBtn.disabled = running;
-    fillMeet.disabled = running;
+    setBusy(running);
     stopBtn.disabled = !running;
   } catch (error) {
     setPageStatus(error.message);
-    startBtn.disabled = false;
-    fillMeet.disabled = false;
+    setBusy(false);
     stopBtn.disabled = true;
   }
 }
@@ -616,14 +626,12 @@ async function startAdding() {
   updateCount();
   if (!names.length) {
     setStatus("Paste at least one name.");
-    startBtn.disabled = false;
-    fillMeet.disabled = false;
+    setBusy(false);
     return false;
   }
   const pauseMs = Math.min(5000, Math.max(200, Number(pauseEl.value) || 600));
   pauseEl.value = String(pauseMs);
-  startBtn.disabled = true;
-  fillMeet.disabled = true;
+  setBusy(true);
   setStatus("Starting…");
   let tabId = 0;
   try {
@@ -646,8 +654,7 @@ async function startAdding() {
           : "The «Добавьте людей» field is not on this page. Open the meeting form first."
       );
       await detachDebugger(tabId);
-      startBtn.disabled = false;
-      fillMeet.disabled = false;
+      setBusy(false);
       return false;
     }
     stopBtn.disabled = false;
@@ -657,8 +664,7 @@ async function startAdding() {
   } catch (error) {
     if (tabId) await detachDebugger(tabId);
     setStatus(error.message);
-    startBtn.disabled = false;
-    fillMeet.disabled = false;
+    setBusy(false);
     return false;
   }
 }
@@ -746,8 +752,7 @@ for (const field of [meetTitle, meetPlace, meetLink, meetTemplate]) {
 }
 
 fillMeet.addEventListener("click", async () => {
-  fillMeet.disabled = true;
-  startBtn.disabled = true;
+  setBusy(true);
   setStatus("Filling the meeting form…");
   let tabId = 0;
   try {
@@ -777,8 +782,56 @@ fillMeet.addEventListener("click", async () => {
   } catch (error) {
     if (tabId) await detachDebugger(tabId);
     setStatus(error.message);
-    startBtn.disabled = false;
-    fillMeet.disabled = false;
+    setBusy(false);
+  }
+});
+
+function applyPackedNames() {
+  namesEl.value = packedNames.join("; ");
+  updateCount();
+  return saveDraft();
+}
+
+mailPackBtn.addEventListener("click", async () => {
+  setBusy(true);
+  setLocalStatus("Reading the open email…");
+  let tabId = 0;
+  try {
+    const tab = await activeTab();
+    tabId = tab.id;
+    await attachDebugger(tab.id);
+    await inject(tab.id);
+    const results = await callPage(tab.id, () => {
+      const grab = window.__owaGrabRecipients;
+      return grab ? grab() : { ok: false, reason: "not-loaded" };
+    });
+    await detachDebugger(tabId);
+    tabId = 0;
+    const grabbed = (results || []).map((entry) => entry.result).find((result) => result?.ok && result.names?.length);
+    if (grabbed) {
+      packedNames = grabbed.names;
+      await storageSet({ recipientBuffer: packedNames });
+      syncMailPack();
+      setLocalStatus(packedNames.length === 1
+        ? "Packed 1 recipient. Open the meeting and press this again."
+        : `Packed ${packedNames.length} recipients. Open the meeting and press this again.`);
+      setBusy(false);
+      return;
+    }
+    if (!packedNames.length) {
+      setLocalStatus("Open an email first. The recipient list is in its header.");
+      setBusy(false);
+      return;
+    }
+    await applyPackedNames();
+    setLocalStatus(packedNames.length === 1
+      ? "Pasted 1 recipient. Adding them."
+      : `Pasted ${packedNames.length} recipients. Adding them.`);
+    await startAdding();
+  } catch (error) {
+    if (tabId) await detachDebugger(tabId);
+    setLocalStatus(error instanceof Error ? error.message : "Could not read the email.");
+    setBusy(false);
   }
 });
 
@@ -983,11 +1036,15 @@ setMenuOpen(false);
 syncCreate();
 renderKeys();
 
-storageGet(["draft", "pause", "lists", "meeting", "githubToken", "sharePass"]).then((saved) => {
+storageGet(["draft", "pause", "lists", "meeting", "githubToken", "sharePass", "recipientBuffer"]).then((saved) => {
   if (typeof saved.draft === "string") namesEl.value = saved.draft;
   if (saved.pause) pauseEl.value = String(saved.pause);
   if (typeof saved.githubToken === "string") githubTokenEl.value = saved.githubToken;
   if (typeof saved.sharePass === "string") sharePassEl.value = saved.sharePass;
+  packedNames = Array.isArray(saved.recipientBuffer)
+    ? saved.recipientBuffer.map((name) => String(name).trim()).filter((name) => name.length > 1)
+    : [];
+  syncMailPack();
   lists = sanitizeLists(saved.lists);
   applyMeeting(saved.meeting);
   ensureMeetingDefaults();
