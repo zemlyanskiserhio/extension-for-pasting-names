@@ -77,6 +77,11 @@
   function findComposeToInput() {
     return [...document.querySelectorAll('input[autoid="_fp_5"], input[role="textbox"]')].find((el) => {
       if (!isVisible(el)) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 10 || rect.height < 10) return false;
+      if (rect.right <= 0 || rect.bottom <= 0 || rect.left >= window.innerWidth || rect.top >= window.innerHeight) {
+        return false;
+      }
       return /^(кому|to)$/i.test((el.getAttribute("aria-label") || "").trim());
     }) || null;
   }
@@ -193,8 +198,8 @@
     const rect = el.getBoundingClientRect();
     const frame = frameOffset();
     return {
-      x: Math.round(rect.left + Math.min(Math.max(rect.width / 2, 8), 180) + frame.x),
-      y: Math.round(rect.top + Math.min(Math.max(rect.height / 2, 6), 22) + frame.y),
+      x: Math.round(rect.left + Math.max(1, Math.min(rect.width / 2, 180)) + frame.x),
+      y: Math.round(rect.top + Math.max(1, Math.min(rect.height / 2, 22)) + frame.y),
     };
   }
 
@@ -623,6 +628,33 @@
     return { failed: bus.state.failed.slice(), skipped: bus.state.skipped.slice(), reason: "done" };
   }
 
+  async function pasteIntoMailTo(input, names) {
+    bus.state.current = names.length;
+    bus.state.total = names.length;
+    bus.state.name = "";
+    bus.state.message = "Pasting into «Кому»";
+    renderPanel();
+
+    await realClick(input);
+    await sleep(80);
+    if (document.activeElement !== input) {
+      input.focus();
+      await sleep(40);
+    }
+    const payload = names.join("; ");
+    await keys("owa-keys.paste", { text: payload });
+    await sleep(120);
+    await keys("owa-keys.char", { char: ";" });
+    await sleep(250);
+    if ((input.value || "").trim()) {
+      await keys("owa-keys.chord", { name: "enter" });
+      await sleep(200);
+    }
+    bus.state.added = names.slice();
+    log(`Pasted ${names.length} into «Кому».`, "ok");
+    renderPanel();
+  }
+
   async function run(names, options) {
     const pauseMs = Math.min(5000, Math.max(200, Number(options?.pauseMs) || 600));
     bus.abort = false;
@@ -642,6 +674,11 @@
 
     try {
       await keys("owa-keys.attach");
+      const target = findAddPeopleInput();
+      if (target && isMailField(target)) {
+        await pasteIntoMailTo(target, names);
+        return;
+      }
       log("Pasting each name, then the last letter.");
       const first = await runPass(names, pauseMs, "Adding");
       const again = [...first.failed, ...first.skipped];
