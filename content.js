@@ -18,6 +18,24 @@
 
   const bus = window.__owaBulkAdd;
 
+  function isEditable(el) {
+    if (!el || !el.isConnected || el.disabled || el.readOnly) return false;
+    const tag = el.tagName;
+    if (tag === "TEXTAREA") return true;
+    if (tag === "INPUT") {
+      const type = (el.getAttribute("type") || "text").toLowerCase();
+      return !["button", "submit", "checkbox", "radio", "file", "hidden"].includes(type);
+    }
+    return !!el.isContentEditable;
+  }
+
+  if (!bus.cursorWatch) {
+    bus.cursorWatch = true;
+    document.addEventListener("focusin", (event) => {
+      if (isEditable(event.target)) bus.lastEditable = event.target;
+    }, true);
+  }
+
   function norm(value) {
     return String(value || "")
       .toLowerCase()
@@ -628,30 +646,37 @@
     return { failed: bus.state.failed.slice(), skipped: bus.state.skipped.slice(), reason: "done" };
   }
 
-  async function pasteIntoMailTo(input, names) {
+  function cursorTarget() {
+    const field = (el) => isEditable(el) && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    if (field(document.activeElement)) return document.activeElement;
+    if (field(bus.lastEditable)) return bus.lastEditable;
+    return findComposeToInput();
+  }
+
+  function onMailScreen() {
+    const where = `${location.pathname}${location.hash}`;
+    if (/\/mail/i.test(where)) return true;
+    return !!findComposeToInput();
+  }
+
+  async function pasteIntoMailTo(names) {
+    const input = cursorTarget();
     bus.state.current = names.length;
     bus.state.total = names.length;
     bus.state.name = "";
-    bus.state.message = "Pasting into «Кому»";
+    if (!input) {
+      bus.state.failed = names.slice();
+      bus.state.message = "No cursor";
+      log("Click in «Кому» first, then press Add one by one.", "bad");
+      renderPanel();
+      return;
+    }
+    bus.state.message = "Pasting where the cursor is";
     renderPanel();
-
-    await realClick(input);
-    await sleep(80);
-    if (document.activeElement !== input) {
-      input.focus();
-      await sleep(40);
-    }
-    const payload = names.join("; ");
-    await keys("owa-keys.paste", { text: payload });
-    await sleep(120);
-    await keys("owa-keys.char", { char: ";" });
-    await sleep(250);
-    if ((input.value || "").trim()) {
-      await keys("owa-keys.chord", { name: "enter" });
-      await sleep(200);
-    }
+    input.focus();
+    await keys("owa-keys.paste", { text: names.join("; ") });
     bus.state.added = names.slice();
-    log(`Pasted ${names.length} into «Кому».`, "ok");
+    log(`Pasted ${names.length} where the cursor was.`, "ok");
     renderPanel();
   }
 
@@ -674,9 +699,8 @@
 
     try {
       await keys("owa-keys.attach");
-      const target = findAddPeopleInput();
-      if (target && isMailField(target)) {
-        await pasteIntoMailTo(target, names);
+      if (onMailScreen()) {
+        await pasteIntoMailTo(names);
         return;
       }
       log("Pasting each name, then the last letter.");
