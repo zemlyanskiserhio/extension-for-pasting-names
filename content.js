@@ -71,7 +71,48 @@
     return [...document.querySelectorAll("input[role='textbox'], input.textbox")].find((el) => {
       if (!isVisible(el)) return false;
       return /людей|people|attendee/i.test(el.getAttribute("aria-label") || "");
+    }) || findComposeToInput();
+  }
+
+  function findComposeToInput() {
+    return [...document.querySelectorAll('input[autoid="_fp_5"], input[role="textbox"]')].find((el) => {
+      if (!isVisible(el)) return false;
+      return /^(кому|to)$/i.test((el.getAttribute("aria-label") || "").trim());
     }) || null;
+  }
+
+  function isMailField(input) {
+    return /^(кому|to)$/i.test((input?.getAttribute("aria-label") || "").trim());
+  }
+
+  function composeWell(input) {
+    return input?.closest('[autoid="_rw_0"]') || input?.closest('[autoid="_mcp_9"]') || null;
+  }
+
+  function composeChips(input) {
+    const well = composeWell(input);
+    if (!well) return [];
+    return [...well.querySelectorAll('[autoid="_pe_b"], [autoid="_pe_o"], [autoid="_pe_i"]')].filter((el) => {
+      if (!isVisible(el) || el.contains(input)) return false;
+      return !el.closest('._fp_H, ._fp_7, [ispopup="1"]');
+    });
+  }
+
+  function wellShowsName(input, name) {
+    const well = composeWell(input);
+    if (!well) return false;
+    return [...well.querySelectorAll("span, div")].some((el) => {
+      if (!isVisible(el) || el.contains(input)) return false;
+      if (el.closest('._fp_H, ._fp_7, [ispopup="1"]')) return false;
+      const text = cleanRecipient(ownText(el));
+      return text && isGoodMatch(text, name);
+    });
+  }
+
+  function listedCount() {
+    const input = findAddPeopleInput();
+    if (input && isMailField(input)) return composeChips(input).length;
+    return attendeeCount();
   }
 
   function attendeeRows() {
@@ -109,6 +150,11 @@
   }
 
   function alreadyListed(name) {
+    const input = findAddPeopleInput();
+    if (input && isMailField(input)) {
+      if (fieldHasName(input, name)) return false;
+      return composeChips(input).some((chip) => isGoodMatch(chip.textContent, name)) || wellShowsName(input, name);
+    }
     return attendeeRows().some((row) => isGoodMatch(row.textContent, name));
   }
 
@@ -369,10 +415,10 @@
     const deadline = Date.now() + ms;
     while (Date.now() < deadline) {
       if (bus.abort) return false;
-      if (attendeeCount() > before || alreadyListed(name)) return true;
+      if (listedCount() > before || alreadyListed(name)) return true;
       await sleep(80);
     }
-    return attendeeCount() > before || alreadyListed(name);
+    return listedCount() > before || alreadyListed(name);
   }
 
   async function chooseSuggestion(item, input, before, name) {
@@ -518,7 +564,7 @@
       if (!input) {
         bus.state.failed.push(name);
         bus.state.message = "Field lost";
-        log("Field «Добавьте людей» disappeared.", "bad");
+        log("The people field disappeared.", "bad");
         return { failed: bus.state.failed.slice(), skipped: bus.state.skipped.slice(), reason: "lost" };
       }
       if (alreadyListed(name)) {
@@ -561,7 +607,7 @@
 
       bus.state.message = `${label}, clicking`;
       renderPanel();
-      const before = attendeeCount();
+      const before = listedCount();
       const added = await chooseSuggestion(item, input, before, name);
       if (added) {
         bus.state.added.push(name);

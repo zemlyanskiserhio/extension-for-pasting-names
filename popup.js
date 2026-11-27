@@ -572,7 +572,7 @@ function bestStatus(results) {
 function describe(status) {
   if (!status) return "Could not reach the page. Refresh Outlook and try again.";
   if (!status.hasField && !status.running && !status.total) {
-    return "The «Добавьте людей» field is not on this page. Open the meeting form first.";
+    return "Open a meeting («Добавьте людей») or a new email («Кому»).";
   }
   if (status.running) {
     return `Adding ${status.current} of ${status.total}: ${status.name}`;
@@ -583,7 +583,7 @@ function describe(status) {
   }
   return status.hasField
     ? "Field found. Paste names and start."
-    : "The «Добавьте людей» field is not on this page.";
+    : "Open a meeting («Добавьте людей») or a new email («Кому»).";
 }
 
 let pollTimer = 0;
@@ -651,7 +651,7 @@ async function startAdding() {
       setStatus(
         reason === "busy"
           ? "Already adding people on this page."
-          : "The «Добавьте людей» field is not on this page. Open the meeting form first."
+          : "Open a meeting («Добавьте людей») or a new email («Кому»)."
       );
       await detachDebugger(tabId);
       setBusy(false);
